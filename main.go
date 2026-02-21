@@ -2,39 +2,19 @@ package main
 
 import (
 	"fmt"
+	"net/http"
+
 	"github.com/pradeepbgs/nanoserve/nanoserve"
 )
 
 
 
 func main() {
-	router := nanoserve.NewTrieRouter(1)
+	router := nanoserve.New()
 
-	router.AddMiddleware("/", func() {
-		fmt.Println("Global Middleware")
-	})
-	router.AddMiddleware("/user/*", func() {
-		fmt.Println("?user middleware")
-	})
-	router.AddRoute("GET", "/user/:id", func() {
-		fmt.Println("GET /user/:id")
-	})
-	router.AddMiddleware("/register", func() {
-		fmt.Println("/register middleware")
-	})
-	router.AddRoute("POST", "/register", func() {
-		fmt.Println("POST register")
+	router.GET("/",func (w http.ResponseWriter, r *http.Request)  {
+		fmt.Fprint(w, "Hello from /")
 	})
 
-	handler := router.MatchRoute("POST", "/register")
-	if handler == nil {
-		fmt.Println("Route Not Found")
-		return
-	}
-
-	for _, f := range handler.Handler {
-		if f != nil {
-			f()
-		}
-	}
+	router.Run(":3000")
 }

@@ -1,59 +1,60 @@
 package nanoserve
 
 import (
+	"net/http"
 	"strings"
 )
 
 type RouteMatch struct {
-	Handler []func()
+	Handler []http.HandlerFunc
 }
 
 type Node struct {
 	children    map[string]*Node
 	isEndOfWord bool
-	handlers    map[string]func()
-	middlewares []func()
+	handlers    map[string]http.HandlerFunc
+	middlewares []http.HandlerFunc
 }
 
-func (n *Node) NewNode() *Node {
+func newNode() *Node {
 	return &Node{
 		children:    make(map[string]*Node),
-		handlers:    make(map[string]func()),
-		middlewares: make([]func(), 0, 10),
-		isEndOfWord: false,
+		handlers:    make(map[string]http.HandlerFunc),
+		middlewares: make([]http.HandlerFunc, 0, 10),
 	}
 }
 
-type Trie struct {
-	root *Node
+type TrieRouter struct {
+	root              *Node
+	globalMiddlewares []http.HandlerFunc
 }
 
-func NewTrieRouter(middlewares_size int) *Trie {
-	return &Trie{
+func NewTrieRouter(middlewaresSize int) *TrieRouter {
+	return &TrieRouter{
 		root: &Node{
-			children:    map[string]*Node{},
-			handlers:    map[string]func(){},
-			isEndOfWord: false,
-			middlewares: make([]func(), 0, middlewares_size),
+			children:    make(map[string]*Node),
+			handlers:    make(map[string]http.HandlerFunc),
+			middlewares: make([]http.HandlerFunc, 0, middlewaresSize),
 		},
 	}
 }
 
-func (r *Trie) AddMiddleware(path string, handlers ...func()) {
+func (r *TrieRouter) AddMiddleware(path string, handlers ...http.HandlerFunc) {
 	node := r.root
+
 	if path == "/" {
-		node.middlewares = append(node.middlewares, handlers...)
+		r.globalMiddlewares = append(r.globalMiddlewares, handlers...)
 		return
 	}
 
-	pathSegments := strings.SplitSeq(path, "/")
+	segments := strings.Split(path, "/")
 
-	for element := range pathSegments {
+	for _, element := range segments {
 		if element == "" {
-			break
+			continue
 		}
-		key := element
 
+		key := element
 		if strings.HasPrefix(element, ":") {
 			key = ":"
 		} else if strings.HasPrefix(element, "*") {
@@ -61,17 +62,16 @@ func (r *Trie) AddMiddleware(path string, handlers ...func()) {
 		}
 
 		if node.children[key] == nil {
-			node.children[key] = node.NewNode()
+			node.children[key] = newNode()
 		}
 		node = node.children[key]
 	}
+
 	node.middlewares = append(node.middlewares, handlers...)
 }
 
-func (r *Trie) AddRoute(method string, path string, handler func()) {
+func (r *TrieRouter) Insert(method string, path string, handler http.HandlerFunc) {
 	node := r.root
-
-	var pathSegments []string = strings.Split(path, "/")
 
 	if path == "/" {
 		node.isEndOfWord = true
@@ -79,51 +79,59 @@ func (r *Trie) AddRoute(method string, path string, handler func()) {
 		return
 	}
 
-	for _, element := range pathSegments {
+	segments := strings.Split(path, "/")
+
+	for _, element := range segments {
 		if element == "" {
 			continue
 		}
-		key := element
 
+		key := element
 		if strings.HasPrefix(element, ":") {
 			key = ":"
 		}
 
 		if node.children[key] == nil {
-			node.children[key] = node.NewNode()
+			node.children[key] = newNode()
 		}
 
 		node = node.children[key]
 	}
+
 	node.isEndOfWord = true
 	node.handlers[method] = handler
 }
 
-func (r *Trie) MatchRoute(method string, path string) *RouteMatch {
+func (r *TrieRouter) Search(method string, path string) *RouteMatch {
 	node := r.root
 
-	pathSegments := strings.Split(path, "/")
-	collectedHandlers := append([]func(){}, node.middlewares...)
+	segments := strings.Split(path, "/")
 
-	for _, element := range pathSegments {
+	collected := append([]http.HandlerFunc{}, r.globalMiddlewares...)
+
+	for _, element := range segments {
 		if element == "" {
 			continue
 		}
+
 		if node.children[element] != nil {
 			node = node.children[element]
 		} else if node.children[":"] != nil {
 			node = node.children[":"]
 		} else if node.children["*"] != nil {
+			node = node.children["*"]
 			break
 		} else {
-			return &RouteMatch{Handler: collectedHandlers}
+			return &RouteMatch{Handler: collected}
 		}
+
+		collected = append(collected, node.middlewares...)
 	}
 
-	methodHandler := node.handlers[method]
-	if methodHandler != nil {
-		collectedHandlers = append(collectedHandlers, methodHandler)
-		return &RouteMatch{Handler: collectedHandlers}
+	if h := node.handlers[method]; h != nil {
+		collected = append(collected, h)
+		return &RouteMatch{Handler: collected}
 	}
+
 	return nil
 }
