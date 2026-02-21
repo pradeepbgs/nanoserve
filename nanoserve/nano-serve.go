@@ -9,8 +9,6 @@ type NanoServe struct {
 	router *TrieRouter
 }
 
-var HttpMethods = []string{"GET", "POST", "PUT", "DELETE"}
-
 func New() *NanoServe {
 	n := &NanoServe{
 		router: NewTrieRouter(10),
@@ -30,9 +28,34 @@ func (n *NanoServe) PUT(path string, h ...http.HandlerFunc) {
 	n.addRoute(http.MethodPut, path, h...)
 }
 
+func (n *NanoServe) PATCH(path string, h ...http.HandlerFunc) {
+	n.addRoute(http.MethodPatch, path, h...)
+}
+
 func (n *NanoServe) DELETE(path string, h ...http.HandlerFunc) {
 	n.addRoute(http.MethodDelete, path, h...)
 }
+
+func (n *NanoServe) HEAD(path string, h ...http.HandlerFunc) {
+	n.addRoute(http.MethodHead, path, h...)
+}
+
+func (n *NanoServe) OPTIONS(path string, h ...http.HandlerFunc) {
+	n.addRoute(http.MethodOptions, path, h...)
+}
+
+func (n *NanoServe) CONNECT(path string, h ...http.HandlerFunc) {
+	n.addRoute(http.MethodConnect, path, h...)
+}
+
+func (n *NanoServe) TRACE(path string, h ...http.HandlerFunc) {
+	n.addRoute(http.MethodTrace, path, h...)
+}
+
+func (n *NanoServe) Handle(method, path string, h ...http.HandlerFunc) {
+	n.addRoute(method, path, h...)
+}
+
 
 func (n *NanoServe) addRoute(method string, path string, handlers ...http.HandlerFunc) {
 	if len(handlers) == 0 {
@@ -50,6 +73,16 @@ func (n *NanoServe) addRoute(method string, path string, handlers ...http.Handle
 
 func (n *NanoServe) Run(addr string) error {
 	return http.ListenAndServe(addr, n)
+}
+
+func (n *NanoServe) Use(pathOrHandler any, handlers ...http.HandlerFunc) {
+	switch v := pathOrHandler.(type) {
+	case string:
+		n.router.AddMiddleware(v,handlers...)
+	case http.HandlerFunc:
+		all := append([]http.HandlerFunc{v}, handlers...)
+		n.router.AddMiddleware("/",all...)
+	}
 }
 
 // Our Main Handler which will handle the incoming request
