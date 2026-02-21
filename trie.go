@@ -1,45 +1,45 @@
 package nanoserve
 
 import (
-	"net/http"
 	"strings"
 )
 
+
 type RouteMatch struct {
-	Handler []http.HandlerFunc
+	Handler []HandlerFuntcion
 }
 
 type Node struct {
 	children    map[string]*Node
 	isEndOfWord bool
-	handlers    map[string]http.HandlerFunc
-	middlewares []http.HandlerFunc
+	handlers    map[string]HandlerFuntcion
+	middlewares []HandlerFuntcion
 }
 
 func newNode() *Node {
 	return &Node{
 		children:    make(map[string]*Node),
-		handlers:    make(map[string]http.HandlerFunc),
-		middlewares: make([]http.HandlerFunc, 0, 10),
+		handlers:    make(map[string]HandlerFuntcion),
+		middlewares: []HandlerFuntcion{},
 	}
 }
 
 type TrieRouter struct {
 	root              *Node
-	globalMiddlewares []http.HandlerFunc
+	globalMiddlewares []HandlerFuntcion
 }
 
-func NewTrieRouter(middlewaresSize int) *TrieRouter {
+func NewTrieRouter() *TrieRouter {
 	return &TrieRouter{
 		root: &Node{
 			children:    make(map[string]*Node),
-			handlers:    make(map[string]http.HandlerFunc),
-			middlewares: make([]http.HandlerFunc, 0, middlewaresSize),
+			handlers:    make(map[string]HandlerFuntcion),
+			middlewares: []HandlerFuntcion{},
 		},
 	}
 }
 
-func (r *TrieRouter) AddMiddleware(path string, handlers ...http.HandlerFunc) {
+func (r *TrieRouter) AddMiddleware(path string, handlers ...HandlerFuntcion) {
 	node := r.root
 
 	if path == "/" {
@@ -70,7 +70,7 @@ func (r *TrieRouter) AddMiddleware(path string, handlers ...http.HandlerFunc) {
 	node.middlewares = append(node.middlewares, handlers...)
 }
 
-func (r *TrieRouter) Insert(method string, path string, handler http.HandlerFunc) {
+func (r *TrieRouter) Insert(method string, path string, handler HandlerFuntcion) {
 	node := r.root
 
 	if path == "/" {
@@ -107,7 +107,7 @@ func (r *TrieRouter) Search(method string, path string) *RouteMatch {
 
 	segments := strings.Split(path, "/")
 
-	collected := append([]http.HandlerFunc{}, r.globalMiddlewares...)
+	collected := append([]HandlerFuntcion{}, r.globalMiddlewares...)
 
 	for _, element := range segments {
 		if element == "" {
