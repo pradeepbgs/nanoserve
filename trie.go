@@ -6,40 +6,40 @@ import (
 
 
 type RouteMatch struct {
-	Handler []HandlerFuntcion
+	Handler []HandlerFunction
 }
 
 type Node struct {
 	children    map[string]*Node
 	isEndOfWord bool
-	handlers    map[string]HandlerFuntcion
-	middlewares []HandlerFuntcion
+	handlers    map[string]HandlerFunction
+	middlewares []HandlerFunction
 }
 
 func newNode() *Node {
 	return &Node{
 		children:    make(map[string]*Node),
-		handlers:    make(map[string]HandlerFuntcion),
-		middlewares: []HandlerFuntcion{},
+		handlers:    make(map[string]HandlerFunction),
+		middlewares: []HandlerFunction{},
 	}
 }
 
 type TrieRouter struct {
 	root              *Node
-	globalMiddlewares []HandlerFuntcion
+	globalMiddlewares []HandlerFunction
 }
 
 func NewTrieRouter() *TrieRouter {
 	return &TrieRouter{
 		root: &Node{
 			children:    make(map[string]*Node),
-			handlers:    make(map[string]HandlerFuntcion),
-			middlewares: []HandlerFuntcion{},
+			handlers:    make(map[string]HandlerFunction),
+			middlewares: []HandlerFunction{},
 		},
 	}
 }
 
-func (r *TrieRouter) AddMiddleware(path string, handlers ...HandlerFuntcion) {
+func (r *TrieRouter) AddMiddleware(path string, handlers ...HandlerFunction) {
 	node := r.root
 
 	if path == "/" {
@@ -70,7 +70,7 @@ func (r *TrieRouter) AddMiddleware(path string, handlers ...HandlerFuntcion) {
 	node.middlewares = append(node.middlewares, handlers...)
 }
 
-func (r *TrieRouter) Insert(method string, path string, handler HandlerFuntcion) {
+func (r *TrieRouter) Insert(method string, path string, handler HandlerFunction) {
 	node := r.root
 
 	if path == "/" {
@@ -107,7 +107,7 @@ func (r *TrieRouter) Search(method string, path string) *RouteMatch {
 
 	segments := strings.Split(path, "/")
 
-	collected := append([]HandlerFuntcion{}, r.globalMiddlewares...)
+	collected := append([]HandlerFunction{}, r.globalMiddlewares...)
 
 	for _, element := range segments {
 		if element == "" {
