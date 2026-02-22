@@ -81,22 +81,30 @@ func (n *NanoServe) Use(pathOrHandler any, handlers ...HandlerFunction) {
 	case HandlerFunction:
 		all := append([]HandlerFunction{v}, handlers...)
 		n.router.AddMiddleware("/", all...)
+	case func(*Context):
+		all := append([]HandlerFunction{v}, handlers...)
+		n.router.AddMiddleware("/", all...)
 	}
 }
 
 // Our Main Handler which will handle the incoming request
 func (n *NanoServe) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	match := n.router.Search(r.Method, r.URL.Path)
-	if match == nil || len(match.Handler) == 0 {
+	if match == nil {
 		http.NotFound(w, r)
 		return
 	}
 
 	c := &Context{
-		Writer: w,
-		Request: r,
+		Writer:   w,
+		Request:  r,
 		handlers: match.Handler,
-		index: 0,
+		index:    0,
+		params: match.Params,
 	}
-	c.handlers[0](c)
+	if len(c.handlers) > 0 {
+		c.handlers[0](c)
+		return
+	}
+	http.NotFound(w,r)
 }

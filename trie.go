@@ -4,9 +4,9 @@ import (
 	"strings"
 )
 
-
 type RouteMatch struct {
 	Handler []HandlerFunction
+	Params  map[string]string
 }
 
 type Node struct {
@@ -14,6 +14,7 @@ type Node struct {
 	isEndOfWord bool
 	handlers    map[string]HandlerFunction
 	middlewares []HandlerFunction
+	paramName   string
 }
 
 func newNode() *Node {
@@ -21,6 +22,7 @@ func newNode() *Node {
 		children:    make(map[string]*Node),
 		handlers:    make(map[string]HandlerFunction),
 		middlewares: []HandlerFunction{},
+		paramName:   "",
 	}
 }
 
@@ -80,15 +82,17 @@ func (r *TrieRouter) Insert(method string, path string, handler HandlerFunction)
 	}
 
 	segments := strings.Split(path, "/")
-
-	for _, element := range segments {
+	routeParams := map[string]interface{}{}
+	for i, element := range segments {
 		if element == "" {
 			continue
 		}
 
 		key := element
+		cleanParam := ""
 		if strings.HasPrefix(element, ":") {
 			key = ":"
+			cleanParam = element[1:]
 		}
 
 		if node.children[key] == nil {
@@ -96,18 +100,24 @@ func (r *TrieRouter) Insert(method string, path string, handler HandlerFunction)
 		}
 
 		node = node.children[key]
+		if cleanParam != "" {
+			routeParams[cleanParam] = i
+			node.paramName = cleanParam
+		}
 	}
-
 	node.isEndOfWord = true
 	node.handlers[method] = handler
 }
 
 func (r *TrieRouter) Search(method string, path string) *RouteMatch {
 	node := r.root
-
 	segments := strings.Split(path, "/")
 
-	collected := append([]HandlerFunction{}, r.globalMiddlewares...)
+	var collected []HandlerFunction
+	collected = r.globalMiddlewares
+	copied := false
+
+	var params map[string]string
 
 	for _, element := range segments {
 		if element == "" {
@@ -118,19 +128,34 @@ func (r *TrieRouter) Search(method string, path string) *RouteMatch {
 			node = node.children[element]
 		} else if node.children[":"] != nil {
 			node = node.children[":"]
+			if node.paramName != "" {
+				if params == nil {
+					params = map[string]string{}
+				}
+				params[node.paramName] = element
+			}
 		} else if node.children["*"] != nil {
 			node = node.children["*"]
 			break
 		} else {
-			return &RouteMatch{Handler: collected}
+			return &RouteMatch{Params: params, Handler: collected}
 		}
-
-		collected = append(collected, node.middlewares...)
+		if len(node.middlewares) > 0 {
+			if !copied {
+				// we are copying global mid in colled only when necessary
+				// otherwise in top collected is just referencing the global midl
+				collected = append([]HandlerFunction{}, collected...)
+			}
+			collected = append(collected, node.middlewares...)
+		}
 	}
 
 	if h := node.handlers[method]; h != nil {
+		if !copied {
+			collected = append([]HandlerFunction{}, collected...)
+		}
 		collected = append(collected, h)
-		return &RouteMatch{Handler: collected}
+		return &RouteMatch{Params: params, Handler: collected}
 	}
 
 	return nil
