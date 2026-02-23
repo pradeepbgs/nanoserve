@@ -14,13 +14,14 @@ The goal of nanoServe is to remain simple, fast, and easy to extend while mainta
 * Variadic handler support
 * Implements `http.Handler` interface
 * Minimal and extensible core design
+* Inbuilt param parser inside `Trie` router
 
 ---
 
 ## Installation
 
 ```bash
-go get github.com/yourusername/nanoserve
+go get github.com/pradeepbgs/nanoserve
 ```
 
 ---
@@ -32,14 +33,19 @@ package main
 
 import (
 	"net/http"
-	"github.com/yourusername/nanoserve"
+	"github.com/pradeepbgs/nanoserve"
 )
 
 func main() {
 	r := nanoserve.New()
 
-	r.GET("/hello", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("Hello World"))
+	globalMiddleware := func(c *nanoserve.Context){
+		fmt.println("path: ", c.Request.URL.Path)
+		c.Next() // it's necessary if you wants to invoke next handlers
+	}
+	r.Use(globalMiddleware)
+	r.GET("/hello", func(c *nanoserve.Context) {
+		c.Text("Hello World",200)
 	})
 
 	r.Run(":8080")
@@ -78,7 +84,7 @@ r.ANY(path, handlers...)
 ### Global Middleware
 
 ```go
-r.Use(func(w http.ResponseWriter, r *http.Request) {
+r.Use(func(c *nanoserve.Context) {
 	println("global middleware")
 })
 ```
@@ -86,7 +92,7 @@ r.Use(func(w http.ResponseWriter, r *http.Request) {
 ### Path-Specific Middleware
 
 ```go
-r.Use("/api", func(w http.ResponseWriter, r *http.Request) {
+r.Use("/api", func(c *nanoserve.Context) {
 	println("api middleware")
 })
 ```
@@ -155,6 +161,7 @@ nanoServe aims to:
 * Avoid unnecessary abstractions
 * Maintain clean separation of concerns
 * Stay idiomatic to Go
+* Lazy work to keep nanoServe fast
 
 ---
 
