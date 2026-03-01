@@ -112,7 +112,6 @@ func (r *TrieRouter) Insert(method string, path string, handler HandlerFunction)
 func (r *TrieRouter) Search(method string, path string) *RouteMatch {
 	node := r.root
 	segments := strings.Split(path, "/")
-
 	var collected []HandlerFunction
 	collected = r.globalMiddlewares
 	copied := false
@@ -142,8 +141,6 @@ func (r *TrieRouter) Search(method string, path string) *RouteMatch {
 		}
 		if len(node.middlewares) > 0 {
 			if !copied {
-				// we are copying global mid in colled only when necessary
-				// otherwise in top collected is just referencing the global midl
 				collected = append([]HandlerFunction{}, collected...)
 			}
 			collected = append(collected, node.middlewares...)
@@ -158,5 +155,5 @@ func (r *TrieRouter) Search(method string, path string) *RouteMatch {
 		return &RouteMatch{Params: params, Handler: collected}
 	}
 
-	return nil
+	return &RouteMatch{Params: params, Handler: collected}
 }
