@@ -4,15 +4,21 @@ import (
 	"net/http"
 )
 
-type HandlerFunction func(*Context)
+type HandlerFunction func(*Context) error
+
+type ErrorHandlerFunc func(*Context, error)
 
 type NanoServe struct {
-	router *TrieRouter
+	router       Router
+	ErrorHandler ErrorHandlerFunc
 }
 
 func New() *NanoServe {
 	return &NanoServe{
 		router: NewTrieRouter(),
+		ErrorHandler: func(c *Context, err error) {
+			http.Error(c.Writer, err.Error(), http.StatusInternalServerError)
+		},
 	}
 }
 
@@ -56,6 +62,19 @@ func (n *NanoServe) Handle(method, path string, h ...HandlerFunction) {
 	n.addRoute(method, path, h...)
 }
 
+// for serving static files
+
+func (n *NanoServe) Static(urlPrefix string, rootDir string) {
+	fs := http.FileServer(http.Dir(rootDir))
+
+	handler := func(ctx *Context) error {
+		http.StripPrefix(urlPrefix, fs).ServeHTTP(ctx.Writer, ctx.Request)
+		return nil
+	}
+
+	n.GET(urlPrefix+"/*", handler)
+}
+
 func (n *NanoServe) addRoute(method string, path string, handlers ...HandlerFunction) {
 	if len(handlers) == 0 {
 		panic("route must have at least one handler")
@@ -81,7 +100,7 @@ func (n *NanoServe) Use(pathOrHandler any, handlers ...HandlerFunction) {
 	case HandlerFunction:
 		all := append([]HandlerFunction{v}, handlers...)
 		n.router.AddMiddleware("/", all...)
-	case func(*Context):
+	case func(*Context) error:
 		all := append([]HandlerFunction{v}, handlers...)
 		n.router.AddMiddleware("/", all...)
 	}
@@ -89,8 +108,8 @@ func (n *NanoServe) Use(pathOrHandler any, handlers ...HandlerFunction) {
 
 // Our Main Handler which will handle the incoming request
 func (n *NanoServe) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	match := n.router.Search(r.Method, r.URL.Path)
 
+	match := n.router.Search(r.Method, r.URL.Path)
 	c := &Context{
 		Writer:   w,
 		Request:  r,
@@ -99,7 +118,9 @@ func (n *NanoServe) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		params: match.Params,
 	}
 	if len(c.handlers) > 0 {
-		c.handlers[0](c)
+		if err := c.handlers[0](c); err != nil {
+			n.ErrorHandler(c, err)
+		}
 		return
 	}
 	http.NotFound(w,r)

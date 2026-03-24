@@ -4,6 +4,12 @@ import (
 	"strings"
 )
 
+type Router interface {
+	Insert(method, path string, handler HandlerFunction)
+	Search(method, path string) *RouteMatch
+	AddMiddleware(path string, handlers ...HandlerFunction)
+}
+
 type RouteMatch struct {
 	Handler []HandlerFunction
 	Params  map[string]string
@@ -146,7 +152,6 @@ func (r *TrieRouter) Search(method string, path string) *RouteMatch {
 			collected = append(collected, node.middlewares...)
 		}
 	}
-
 	if h := node.handlers[method]; h != nil {
 		if !copied {
 			collected = append([]HandlerFunction{}, collected...)

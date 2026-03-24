@@ -39,13 +39,16 @@ import (
 func main() {
 	r := nanoserve.New()
 
-	globalMiddleware := func(c *nanoserve.Context){
+	globalMiddleware := func(c *nanoserve.Context) error {
 		fmt.println("path: ", c.Request.URL.Path)
 		c.Next() // it's necessary if you wants to invoke next handlers
+		return nil
 	}
 	r.Use(globalMiddleware)
-	r.GET("/hello", func(c *nanoserve.Context) {
-		c.Text("Hello World",200)
+	r.GET("/hello", func(c *nanoserve.Context) error {
+		c.Text("Hello World",200) // return c.Text("Hello World",200)
+		// OR
+		return nil
 	})
 
 	r.Run(":8080")
@@ -92,8 +95,9 @@ r.Use(func(c *nanoserve.Context) {
 ### Path-Specific Middleware
 
 ```go
-r.Use("/api", func(c *nanoserve.Context) {
+r.Use("/api", func(c *nanoserve.Context) error {
 	println("api middleware")
+	return nil
 })
 ```
 
